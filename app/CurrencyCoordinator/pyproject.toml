@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "CurrencyAgent"
+version = "0.1.0"
+description = "Bedrock AgentCore A2A currency specialist"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aws-opentelemetry-distro",
+    "bedrock-agentcore[a2a] >= 1.18.1",
+    "botocore[crt] >= 1.35.0",
+    "strands-agents >= 1.15.0",
+    "a2a-sdk >= 1.1.2",
+    "mcp >= 1.28.1",
+    # Entra tokens for the Foundry A2A peer; boto3 reads the service
+    # principal from AWS Secrets Manager (see coordinator/entra_auth.py).
+    "azure-identity >= 1.25.3",
+    # azure.identity.aio delegates to azure-core's optional aiohttp transport.
+    "aiohttp == 3.13.3",
+    "boto3 >= 1.40",
+    "httpx >= 0.28",
+    "pydantic >= 2.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

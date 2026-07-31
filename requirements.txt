@@ -1,0 +1,17 @@
+# Direct hosted-coordinator dependencies for the AgentCore deployment.
+# a2a-sdk 1.1.2 was validated live against google-adk 2.5.0 on 2026-07-27.
+# AWS pins are research-validated candidates (2026-07-28); re-pin after the
+# first verified end-to-end AgentCore deployment.
+bedrock-agentcore[a2a]==1.18.1
+strands-agents==1.50.2
+a2a-sdk==1.1.2
+mcp==1.28.1
+# Entra authentication for the Foundry A2A peer (coordinator/entra_auth.py).
+azure-identity==1.25.3
+# Required by azure.identity.aio's default HTTP transport. azure-identity
+# intentionally leaves this transport optional, so an AgentCore deployment
+# without an explicit pin fails before it can mint the Foundry bearer token.
+aiohttp==3.13.3
+boto3>=1.40
+httpx==0.28.1
+pydantic==2.13.4

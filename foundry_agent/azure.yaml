@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+#
+# Deploys the Foundry master coordinator. It calls the Bedrock AgentCore
+# specialist over A2A v1.0.
+
+name: bedrock-foundry-a2a-currency
+services:
+    ai-project:
+        host: azure.ai.project
+        deployments:
+            - model:
+                format: OpenAI
+                name: gpt-5-mini
+                version: "2025-08-07"
+              name: gpt-5-mini
+              sku:
+                capacity: 50
+                name: GlobalStandard
+    currency-coordinator:
+        project: .
+        host: azure.ai.agent
+        language: python
+        uses:
+            - ai-project
+        codeConfiguration:
+            dependencyResolution: remote_build
+            entryPoint: main.py
+            runtime: python_3_13
+        container:
+            resources:
+                cpu: "0.5"
+                memory: 1Gi
+        environmentVariables:
+            - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+              # This service owns the deployment above, so its stable deployment
+              # name is configuration, not an azd environment output. Referencing
+              # an unset azd value registers an empty variable and the container
+              # fails its readiness check before FoundryChatClient can start.
+              value: gpt-5-mini
+            - name: CURRENCY_RATE_PROVIDER
+              value: ${CURRENCY_RATE_PROVIDER}
+            - name: CURRENCY_RATE_TRANSPORT
+              value: mcp-stdio
+            - name: CURRENCY_A2A_PEER
+              value: bedrock
+            - name: CURRENCY_BEDROCK_A2A_ENDPOINT
+              value: ${CURRENCY_BEDROCK_A2A_ENDPOINT}
+            - name: CURRENCY_BEDROCK_A2A_BEARER_TOKEN
+              value: ${CURRENCY_BEDROCK_A2A_BEARER_TOKEN}
+        kind: hosted
+        name: currency-coordinator
+        protocols:
+            - protocol: responses
+              version: 2.0.0
+infra:
+    provider: microsoft.foundry

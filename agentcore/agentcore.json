@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "currencybench",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "currencybench"
+  },
+  "runtimes": [
+    {
+      "name": "CurrencyAgent",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/CurrencyCoordinator/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "A2A",
+      "envVars": [
+        { "name": "BEDROCK_MODEL_ID", "value": "us.amazon.nova-micro-v1:0" },
+        { "name": "CURRENCY_RATE_PROVIDER", "value": "frankfurter" },
+        { "name": "CURRENCY_TIMEOUT_SECONDS", "value": "60" }
+      ]
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "payments": []
+}

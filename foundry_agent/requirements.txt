@@ -1,0 +1,13 @@
+# Direct dependencies of the Foundry-hosted master coordinator.
+# Versions carried over from the validated 2026-07-27 Foundry deployment in
+# ../foundry-adk-a2a-currency; re-pin after the first verified deployment of
+# this agent. `mcp` is explicit: agent-framework-core does not depend on it,
+# but MCPStdioTool does.
+agent-framework-core==1.12.1
+agent-framework-foundry==1.10.3
+agent-framework-foundry-hosting==1.0.0b260722
+a2a-sdk==1.1.2
+azure-identity==1.25.3
+mcp==1.28.1
+httpx==0.28.1
+pydantic==2.13.4
