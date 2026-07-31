@@ -3,9 +3,14 @@ title: "Flipping A2A Around: Microsoft Foundry as the Master, Bedrock AgentCore 
 published: false
 series: A2A
 tags: azure, aws, aiagents, a2a
+cover_image: https://raw.githubusercontent.com/xbill9/foundry-bedrock-a2a-currency/main/devto-cover-foundry-master.png
 ---
 
-I previously built this currency benchmark in the other direction:
+The goal of this project is coverage: validate that Microsoft Foundry works as
+the main cloud and orchestration layer while Amazon Bedrock AgentCore works as
+the remote A2A system.
+
+I had already validated the opposite direction:
 
 ```text
 Amazon Bedrock AgentCore coordinator
@@ -13,11 +18,13 @@ Amazon Bedrock AgentCore coordinator
     +-- A2A --> Microsoft Foundry remote agent
 ```
 
-That path worked, but it left a useful interoperability question unanswered:
-does the same domain core still work when Microsoft Foundry owns orchestration
-and Amazon Bedrock AgentCore becomes the remote A2A specialist?
+That path worked, but it covered only one half of the interoperability matrix.
+It proved that Amazon could be the main cloud and Microsoft could be remote. It
+did not prove that Foundry could own the workflow, call its local MCP baseline,
+delegate across A2A, apply deterministic verification, and return the final
+result while Amazon remained behind the remote-agent boundary.
 
-I flipped the architecture:
+This implementation fills that coverage gap:
 
 ```text
 Microsoft Foundry coordinator
@@ -32,10 +39,28 @@ Microsoft Foundry coordinator
 The code is in
 [xbill9/foundry-bedrock-a2a-currency](https://github.com/xbill9/foundry-bedrock-a2a-currency).
 
-At the time of writing, the inverted implementation passes all 67 deterministic
-tests. The new cloud direction has not yet been deployed and benchmarked, so
-this post distinguishes the implemented architecture from the earlier observed
-AWS-to-Azure results.
+At the time of writing, the Foundry-main implementation passes all 67
+deterministic tests. The new cloud direction has not yet been deployed and
+benchmarked, so this post distinguishes implemented coverage from deployed
+coverage and from the earlier observed AWS-to-Azure results.
+
+## The validation target
+
+“Foundry works as the main cloud” means more than hosting a model that can call
+an HTTP endpoint. The target is a complete coordinator role:
+
+- Foundry receives the user request and owns the conversation.
+- Microsoft Agent Framework selects one benchmark workflow.
+- The Foundry-hosted process runs the MCP-only baseline locally.
+- It discovers and invokes the Bedrock specialist through A2A.
+- Framework-independent code compares both quotes with `Decimal`.
+- Foundry returns structured failures, timestamps, sources, and warnings.
+- Bedrock remains independently deployable and knows nothing about the
+  coordinator's benchmark policy.
+
+The validation fails if the happy path works only because the Foundry model
+performs arithmetic, if the caller bypasses A2A with a custom REST contract, or
+if AWS-specific logic leaks into the domain coordinator.
 
 ## This is a benchmark, not another chatbot
 
@@ -67,7 +92,7 @@ agreed = relative_difference <= Decimal("0.005")
 If the legs disagree, the coordinator returns both quotes and a warning. It
 does not ask either model to choose the more convincing number.
 
-## Why the flip matters
+## Why coverage in both directions matters
 
 It would have been easy to rewrite the application around Microsoft Agent
 Framework. That would make the comparison less useful.
@@ -93,8 +118,10 @@ currency, target currencies, and benchmark mode, then invokes
 AgentCore now hosts a narrow Strands specialist. It exposes an A2A server and
 has one currency tool backed by MCP.
 
-That separation is the main design result: changing which cloud is “in charge”
-does not change validation, arithmetic, comparison, or failure policy.
+That separation is the main design result. Foundry can take coverage as the
+main cloud without changing validation, arithmetic, comparison, or failure
+policy. Bedrock can move behind the remote boundary without learning how the
+master chooses modes or handles partial failure.
 
 ## The Foundry master
 
@@ -303,14 +330,14 @@ azd auth login
 The script supplies the endpoint as configuration and the token as an azd
 secret.
 
-## What is observed and what is still a hypothesis
+## Coverage status: observed versus pending
 
 Observed:
 
 - The earlier Bedrock-master to Foundry-remote topology completed all three
   hosted modes on July 29, 2026.
 - Its smoke conversion for 100 USD to EUR agreed across MCP and A2A.
-- The inverted code passes 67 local deterministic tests.
+- The Foundry-main code passes 67 local deterministic tests.
 - The AgentCore runtime is configured for A2A and the Foundry host is configured
   as the coordinator.
 
@@ -326,10 +353,23 @@ Not yet observed:
 I would rather publish those as open measurements than imply that a green unit
 test proves cloud interoperability.
 
-## What this architecture lets us measure
+## What completes the Foundry-main validation
 
-Once the inverted deployment runs, the interesting comparison is no longer
-“can A2A return HTTP 200?”
+The implementation provides structural and deterministic test coverage. The
+remaining acceptance run must prove the cloud boundary itself. Foundry-main
+coverage is complete when:
+
+1. A real Foundry-hosted request completes in all three modes.
+2. `a2a_only` shows `hosted-bedrock-a2a` as its source.
+3. `verified` records both the Foundry-side MCP quote and Bedrock-side quote.
+4. A forced A2A failure returns the MCP result as unverified.
+5. A forced MCP failure returns the Bedrock result as unverified.
+6. A disagreement returns both values and a deterministic warning.
+7. Authentication, card discovery, and trace identifiers are captured with
+   secrets and account identifiers redacted.
+
+Once those checks run, the interesting comparison is no longer “can A2A return
+HTTP 200?”
 
 It is:
 
@@ -341,9 +381,9 @@ It is:
 - Can the same 38 cases and deterministic scorers compare both directions
   without special treatment?
 
-That is the point of flipping the architecture. A portable agent protocol is
-most convincing when either framework can be the master and the benchmark
-still means the same thing.
+That is the point of this coverage work. A portable agent protocol is most
+convincing when Foundry can be the main cloud, Amazon can be remote, and the
+benchmark still means exactly the same thing.
 
 ## References
 
