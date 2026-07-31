@@ -1,5 +1,6 @@
 ---
-title: "Flipping A2A Around: Microsoft Foundry as the Master, Bedrock AgentCore as the Remote Agent"
+title: "Validating Microsoft Foundry as the Main Cloud with Bedrock AgentCore Remote"
+description: "Closing the A2A coverage gap: Microsoft Foundry owns orchestration, MCP verification, and failure policy while Amazon Bedrock AgentCore serves the remote specialist."
 published: false
 series: A2A
 tags: azure, aws, aiagents, a2a
