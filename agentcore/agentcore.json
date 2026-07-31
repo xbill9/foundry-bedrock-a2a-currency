@@ -16,6 +16,14 @@
       "runtimeVersion": "PYTHON_3_14",
       "networkMode": "PUBLIC",
       "protocol": "A2A",
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/REPLACE_USER_POOL_ID/.well-known/openid-configuration",
+          "allowedClients": ["REPLACE_APP_CLIENT_ID"],
+          "allowedScopes": ["currencybench/invoke"]
+        }
+      },
       "envVars": [
         { "name": "BEDROCK_MODEL_ID", "value": "us.amazon.nova-micro-v1:0" },
         { "name": "CURRENCY_RATE_PROVIDER", "value": "frankfurter" },

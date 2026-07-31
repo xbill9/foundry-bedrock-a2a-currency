@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-07-30",
+  "topology": {
+    "coordinator": "Microsoft Foundry hosted agent",
+    "mcp_leg": "stdio MCP live-rate adapter",
+    "remote_leg": "Amazon Bedrock AgentCore A2A runtime"
+  },
+  "case": {
+    "amount": "100",
+    "source_currency": "USD",
+    "target_currency": "EUR"
+  },
+  "runs": [
+    {
+      "mode": "mcp_only",
+      "converted_amount": "87.13800",
+      "rate": "0.87138",
+      "adapter_elapsed_ms": 359.135293,
+      "failures": {}
+    },
+    {
+      "mode": "a2a_only",
+      "converted_amount": "87.138",
+      "rate": "0.87138",
+      "adapter_elapsed_ms": 25104.737852,
+      "failures": {}
+    },
+    {
+      "mode": "verified",
+      "primary_rate": "0.87138",
+      "verifier_rate": "0.87138",
+      "relative_difference": "0",
+      "agreed": true,
+      "adapter_elapsed_ms": 28163.294741,
+      "failures": {}
+    }
+  ],
+  "scope_note": "Single smoke case; not a latency distribution or completed benchmark matrix.",
+  "sanitization": "Cloud account IDs, resource IDs, endpoints, client IDs, tokens, session IDs, conversation IDs, and trace IDs are omitted."
+}

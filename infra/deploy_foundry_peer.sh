@@ -20,18 +20,23 @@ if [[ -z "${CURRENCY_BEDROCK_A2A_ENDPOINT:-}" ]]; then
   echo "CURRENCY_BEDROCK_A2A_ENDPOINT is required." >&2
   exit 2
 fi
-if [[ -z "${CURRENCY_BEDROCK_A2A_BEARER_TOKEN:-}" ]]; then
-  echo "CURRENCY_BEDROCK_A2A_BEARER_TOKEN is required." >&2
-  exit 2
-fi
+for name in CURRENCY_BEDROCK_OAUTH_TOKEN_URL CURRENCY_BEDROCK_OAUTH_CLIENT_ID \
+  CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET CURRENCY_BEDROCK_OAUTH_SCOPE; do
+  if [[ -z "${!name:-}" ]]; then
+    echo "$name is required." >&2
+    exit 2
+  fi
+done
 
 echo "=== 2/3 configure Bedrock peer ==="
 cd "$AGENT_DIR"
 azd env select "$AZD_ENV" 2>/dev/null || azd env new "$AZD_ENV"
 azd env set CURRENCY_RATE_PROVIDER "${CURRENCY_RATE_PROVIDER:-frankfurter}"
 azd env set CURRENCY_BEDROCK_A2A_ENDPOINT "$CURRENCY_BEDROCK_A2A_ENDPOINT"
-azd env set --secret CURRENCY_BEDROCK_A2A_BEARER_TOKEN \
-  "$CURRENCY_BEDROCK_A2A_BEARER_TOKEN"
+azd env set CURRENCY_BEDROCK_OAUTH_TOKEN_URL "$CURRENCY_BEDROCK_OAUTH_TOKEN_URL"
+azd env set CURRENCY_BEDROCK_OAUTH_CLIENT_ID "$CURRENCY_BEDROCK_OAUTH_CLIENT_ID"
+azd env set CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET "$CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET"
+azd env set CURRENCY_BEDROCK_OAUTH_SCOPE "$CURRENCY_BEDROCK_OAUTH_SCOPE"
 
 echo "=== 3/3 azd provision + deploy ==="
 azd provision --no-prompt

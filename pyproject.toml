@@ -23,6 +23,7 @@ currency-mcp-server = "mcp_server.server:main"
 # official quickstarts. Keeping them out of the initial skeleton avoids encoding
 # an API surface that may already have moved.
 dev = [
+  "pyyaml>=6.0.2",
   "pytest>=8.3",
   "pytest-asyncio>=0.25",
   "ruff>=0.9",

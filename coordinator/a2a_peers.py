@@ -40,6 +40,10 @@ class A2APeerProfile:
     #: Entra scope to mint a bearer token for, or None for anonymous peers.
     auth_scope: str | None = None
     token_env: str | None = None
+    oauth_token_url_env: str | None = None
+    oauth_client_id_env: str | None = None
+    oauth_client_secret_env: str | None = None
+    oauth_scope_env: str | None = None
     #: Environment variable holding this peer's base URL.
     endpoint_env: str = "CURRENCY_A2A_ENDPOINT"
 
@@ -55,6 +59,10 @@ BEDROCK_PEER = A2APeerProfile(
     source="hosted-bedrock-a2a",
     rewrite_card_urls=False,
     token_env="CURRENCY_BEDROCK_A2A_BEARER_TOKEN",
+    oauth_token_url_env="CURRENCY_BEDROCK_OAUTH_TOKEN_URL",
+    oauth_client_id_env="CURRENCY_BEDROCK_OAUTH_CLIENT_ID",
+    oauth_client_secret_env="CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET",
+    oauth_scope_env="CURRENCY_BEDROCK_OAUTH_SCOPE",
     endpoint_env="CURRENCY_BEDROCK_A2A_ENDPOINT",
 )
 

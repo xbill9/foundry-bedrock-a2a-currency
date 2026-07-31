@@ -1,60 +1,60 @@
-"""Invoke the AgentCore-hosted coordinator runtime.
+"""Invoke the Foundry-hosted master over the Responses protocol.
 
 Usage:
-    export AGENTCORE_RUNTIME_ARN="arn:aws:bedrock-agentcore:REGION:ACCOUNT:runtime/NAME"
-    python3 -m evaluations.invoke_hosted "Convert 500 EUR to USD and CHF in verified mode."
-
-Authenticates with the standard AWS credential chain (SigV4); the caller needs
-bedrock-agentcore:InvokeAgentRuntime on the runtime ARN. The runtime ARN is
-printed by `agentcore deploy` (see infra/README.md).
+    export FOUNDRY_RESPONSES_ENDPOINT="$(cd foundry_agent && azd env get-value \
+AGENT_CURRENCY_COORDINATOR_RESPONSES_ENDPOINT)"
+    python3 -m evaluations.invoke_hosted \
+      "Convert 100 USD to EUR in verified mode."
 """
 
-import json
 import os
 import sys
 
+import httpx
 
-def extract_result_text(payload: dict) -> list[str]:
-    """Return the entrypoint's non-empty result text parts."""
-    result = payload.get("result")
-    if isinstance(result, str) and result:
-        return [result]
-    return []
+
+def extract_output_text(payload: dict) -> list[str]:
+    """Return every non-empty Responses API output-text part."""
+    texts: list[str] = []
+    for item in payload.get("output", []):
+        for part in item.get("content", []) or []:
+            if part.get("type") == "output_text" and part.get("text"):
+                texts.append(part["text"])
+    return texts
 
 
 def response_diagnostic(payload: dict) -> dict:
     """Return non-sensitive response metadata for an empty-output failure."""
     return {
+        "status": payload.get("status"),
         "error": payload.get("error"),
-        "detail": payload.get("detail"),
-        "keys": sorted(payload.keys()),
+        "incomplete_details": payload.get("incomplete_details"),
+        "output_types": [
+            item.get("type") for item in payload.get("output", []) if isinstance(item, dict)
+        ],
     }
 
 
 def main() -> int:
-    runtime_arn = os.environ.get("AGENTCORE_RUNTIME_ARN")
-    if not runtime_arn or len(sys.argv) < 2:
+    from azure.identity import DefaultAzureCredential
+
+    endpoint = os.environ.get("FOUNDRY_RESPONSES_ENDPOINT")
+    if not endpoint or len(sys.argv) < 2:
         print(__doc__, file=sys.stderr)
         return 2
-    import boto3
-
-    client = boto3.client("bedrock-agentcore", region_name=os.environ.get("AWS_REGION"))
-    response = client.invoke_agent_runtime(
-        agentRuntimeArn=runtime_arn,
-        qualifier=os.environ.get("AGENTCORE_QUALIFIER", "DEFAULT"),
-        payload=json.dumps({"prompt": sys.argv[1]}).encode(),
+    token = DefaultAzureCredential().get_token("https://ai.azure.com/.default").token
+    response = httpx.post(
+        endpoint,
+        headers={"Authorization": f"Bearer {token}"},
+        json={"input": sys.argv[1], "stream": False},
+        timeout=240,
     )
-    body = response["response"].read().decode("utf-8")
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError:
-        print(f"Hosted response was not JSON (contentType "
-              f"{response.get('contentType')!r}): {body[:500]}", file=sys.stderr)
-        return 1
-    texts = extract_result_text(payload)
+    response.raise_for_status()
+    payload = response.json()
+    texts = extract_output_text(payload)
     if not texts:
         print(
-            f"Hosted response contained no result text: {response_diagnostic(payload)}",
+            f"Hosted response contained no output text: {response_diagnostic(payload)}",
             file=sys.stderr,
         )
         return 1

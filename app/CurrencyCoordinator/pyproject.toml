@@ -10,10 +10,12 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "aws-opentelemetry-distro",
-    "bedrock-agentcore[a2a] >= 1.18.1",
+    "bedrock-agentcore[a2a] == 1.19.0",
     "botocore[crt] >= 1.35.0",
     "strands-agents >= 1.15.0",
-    "a2a-sdk >= 1.1.2",
+    # AgentCore's A2A server currently implements the 0.3 SDK surface. Keep
+    # this server bundle independent from the coordinator's 1.x client.
+    "a2a-sdk[all] == 0.3.26",
     "mcp >= 1.28.1",
     # Entra tokens for the Foundry A2A peer; boto3 reads the service
     # principal from AWS Secrets Manager (see coordinator/entra_auth.py).

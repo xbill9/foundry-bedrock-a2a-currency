@@ -22,10 +22,7 @@ services:
         language: python
         uses:
             - ai-project
-        codeConfiguration:
-            dependencyResolution: remote_build
-            entryPoint: main.py
-            runtime: python_3_13
+        image: ${FOUNDRY_AGENT_IMAGE}
         container:
             resources:
                 cpu: "0.5"
@@ -43,10 +40,19 @@ services:
               value: mcp-stdio
             - name: CURRENCY_A2A_PEER
               value: bedrock
+            - name: CURRENCY_TIMEOUT_SECONDS
+              # AgentCore cold starts can exceed the coordinator's local default.
+              value: "60"
             - name: CURRENCY_BEDROCK_A2A_ENDPOINT
               value: ${CURRENCY_BEDROCK_A2A_ENDPOINT}
-            - name: CURRENCY_BEDROCK_A2A_BEARER_TOKEN
-              value: ${CURRENCY_BEDROCK_A2A_BEARER_TOKEN}
+            - name: CURRENCY_BEDROCK_OAUTH_TOKEN_URL
+              value: ${CURRENCY_BEDROCK_OAUTH_TOKEN_URL}
+            - name: CURRENCY_BEDROCK_OAUTH_CLIENT_ID
+              value: ${CURRENCY_BEDROCK_OAUTH_CLIENT_ID}
+            - name: CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET
+              value: ${CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET}
+            - name: CURRENCY_BEDROCK_OAUTH_SCOPE
+              value: ${CURRENCY_BEDROCK_OAUTH_SCOPE}
         kind: hosted
         name: currency-coordinator
         protocols:

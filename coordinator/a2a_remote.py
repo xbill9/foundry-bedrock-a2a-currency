@@ -139,6 +139,22 @@ class A2ARemoteCurrencyAgent:
 
             if token := os.getenv(self._peer.token_env):
                 token_provider = StaticTokenProvider(token)
+        if token_provider is None and self._peer.oauth_token_url_env:
+            oauth_values = (
+                os.getenv(self._peer.oauth_token_url_env),
+                os.getenv(self._peer.oauth_client_id_env or ""),
+                os.getenv(self._peer.oauth_client_secret_env or ""),
+                os.getenv(self._peer.oauth_scope_env or ""),
+            )
+            if all(oauth_values):
+                from coordinator.oauth_auth import ClientCredentialsTokenProvider
+
+                token_provider = ClientCredentialsTokenProvider(
+                    oauth_values[0],
+                    oauth_values[1],
+                    oauth_values[2],
+                    scope=oauth_values[3],
+                )
         if token_provider is None and self._peer.auth_scope:
             token_provider = build_token_provider(self._peer.auth_scope)
         self._token_provider = token_provider

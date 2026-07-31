@@ -16,13 +16,17 @@ Deploy the AgentCore A2A runtime first, then:
 
 ```bash
 export CURRENCY_BEDROCK_A2A_ENDPOINT='https://.../invocations/'
-export CURRENCY_BEDROCK_A2A_BEARER_TOKEN='...'
+export CURRENCY_BEDROCK_OAUTH_TOKEN_URL='https://.../oauth2/token'
+export CURRENCY_BEDROCK_OAUTH_CLIENT_ID='...'
+export CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET='...'
+export CURRENCY_BEDROCK_OAUTH_SCOPE='currencybench/invoke'
 az login && azd auth login
 ./infra/deploy_foundry_peer.sh
 ```
 
-The deploy script stores the bearer value as a secret in the azd environment.
-Do not put tokens in `azure.yaml`, `.env`, logs, or benchmark evidence.
+The deploy script registers the settings with the hosted agent, which obtains
+short-lived access tokens at runtime. Do not put the client secret or tokens in
+tracked files, logs, or benchmark evidence.
 
 `coordinator/` and `mcp_server/` here are generated bundle copies. Edit the
 root packages and run `infra/sync_app.sh`.

@@ -1,5 +1,5 @@
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 import yaml
 
@@ -41,6 +41,19 @@ def test_agentcore_entrypoint_is_the_remote_a2a_agent() -> None:
 
     assert "serve_a2a(StrandsA2AExecutor(agent))" in entrypoint
     assert "remote currency specialist" in entrypoint
+
+
+def test_agentcore_a2a_server_uses_the_sdk_version_required_by_runtime() -> None:
+    """AgentCore's A2A extra and a2a-sdk 1.x cannot share one bundle."""
+    manifest_path = (
+        Path(__file__).parents[1] / "app" / "CurrencyCoordinator" / "pyproject.toml"
+    )
+    dependencies = tomllib.loads(manifest_path.read_text(encoding="utf-8"))["project"][
+        "dependencies"
+    ]
+
+    assert "bedrock-agentcore[a2a] == 1.19.0" in dependencies
+    assert "a2a-sdk[all] == 0.3.26" in dependencies
 
 
 def test_adk_image_uses_system_python_and_an_explicit_package_layout() -> None:

@@ -1,88 +1,67 @@
 ---
-title: "Validating Microsoft Foundry as the Main Cloud with Bedrock AgentCore Remote"
-description: "Closing the A2A coverage gap: Microsoft Foundry owns orchestration, MCP verification, and failure policy while Amazon Bedrock AgentCore serves the remote specialist."
+title: "Foundry as Master, Bedrock as Remote: The Smoke Test Finally Passed"
+description: "A measured cross-cloud smoke test: Microsoft Foundry orchestrates MCP and calls an Amazon Bedrock AgentCore specialist over authenticated A2A."
 published: false
 series: A2A
 tags: azure, aws, aiagents, a2a
 cover_image: https://raw.githubusercontent.com/xbill9/foundry-bedrock-a2a-currency/main/devto-cover-foundry-master.png
 ---
 
-The goal of this project is coverage: validate that Microsoft Foundry works as
-the main cloud and orchestration layer while Amazon Bedrock AgentCore works as
-the remote A2A system.
-
-I had already validated the opposite direction:
+I wanted one specific piece of coverage:
 
 ```text
-Amazon Bedrock AgentCore coordinator
-    |
-    +-- A2A --> Microsoft Foundry remote agent
+Microsoft Foundry (master)
+    ├── MCP ──> live exchange-rate baseline
+    └── A2A ──> Amazon Bedrock AgentCore (remote specialist)
 ```
 
-That path worked, but it covered only one half of the interoperability matrix.
-It proved that Amazon could be the main cloud and Microsoft could be remote. It
-did not prove that Foundry could own the workflow, call its local MCP baseline,
-delegate across A2A, apply deterministic verification, and return the final
-result while Amazon remained behind the remote-agent boundary.
+On July 30, 2026, that direction worked end to end.
 
-This implementation fills that coverage gap:
+This matters because I had already tested the reverse topology—AgentCore as
+coordinator and Foundry as remote. A cross-cloud claim based on only one
+direction is weak. This run proves Foundry can own the request, execute its
+local MCP baseline, call an AgentCore A2A agent, and apply deterministic
+verification.
 
-```text
-Microsoft Foundry coordinator
-    |
-    +-- MCP --> live exchange-rate baseline
-    |
-    +-- A2A v1.0 --> Bedrock AgentCore currency specialist
-                           |
-                           +-- MCP --> independent live conversion
-```
-
-The code is in
+The code and sanitized evidence are in
 [xbill9/foundry-bedrock-a2a-currency](https://github.com/xbill9/foundry-bedrock-a2a-currency).
 
-At the time of writing, the Foundry-main implementation passes all 67
-deterministic tests. The new cloud direction has not yet been deployed and
-benchmarked, so this post distinguishes implemented coverage from deployed
-coverage and from the earlier observed AWS-to-Azure results.
+## What actually passed
 
-## The validation target
+The input was `100 USD → EUR`. I invoked the Foundry-hosted coordinator through
+its Responses endpoint in all three benchmark modes:
 
-“Foundry works as the main cloud” means more than hosting a model that can call
-an HTTP endpoint. The target is a complete coordinator role:
+| Mode | Path | Observed result | Adapter time |
+|---|---|---:|---:|
+| `mcp_only` | Foundry → local MCP | 87.13800 EUR | 359 ms |
+| `a2a_only` | Foundry → A2A → AgentCore | 87.138 EUR | 25,105 ms |
+| `verified` | both paths concurrently | exact agreement | 28,163 ms |
 
-- Foundry receives the user request and owns the conversation.
-- Microsoft Agent Framework selects one benchmark workflow.
-- The Foundry-hosted process runs the MCP-only baseline locally.
-- It discovers and invokes the Bedrock specialist through A2A.
-- Framework-independent code compares both quotes with `Decimal`.
-- Foundry returns structured failures, timestamps, sources, and warnings.
-- Bedrock remains independently deployable and knows nothing about the
-  coordinator's benchmark policy.
+The verified result reported:
 
-The validation fails if the happy path works only because the Foundry model
-performs arithmetic, if the caller bypasses A2A with a custom REST contract, or
-if AWS-specific logic leaks into the domain coordinator.
+```json
+{
+  "relative_difference": "0",
+  "agreed": true,
+  "failures": {}
+}
+```
 
-## This is a benchmark, not another chatbot
+That is one smoke case, not a latency distribution and not a completed
+benchmark matrix. The useful conclusion is narrower: the Foundry-master cloud
+boundary works, including authentication, discovery, invocation, and
+deterministic comparison.
 
-Currency conversion is useful here because it gives the system:
+The repository also passes 66 deterministic tests; one optional integration
+test is skipped without its external dependency.
 
-- a small, constrained domain;
-- exact inputs and outputs;
-- a public live data source;
-- deterministic arithmetic; and
-- obvious failure cases.
+## The model does not do the math
 
-The master supports three modes:
+Currency conversion makes interoperability easy to falsify. Every quote carries
+the amount, rate, converted amount, observation time, source, and adapter
+latency. Money and rates use Python `Decimal`.
 
-| Mode | Execution path |
-|---|---|
-| `mcp_only` | Foundry calls the exchange-rate MCP adapter |
-| `a2a_only` | Foundry delegates to the Bedrock A2A agent |
-| `verified` | Both execute concurrently and deterministic code compares them |
-
-The model never calculates an amount and never judges whether two answers
-agree. Python `Decimal` owns both operations:
+The coordinator—not an LLM—checks agreement:
 
 ```python
 difference = abs(primary.converted_amount - verifier.converted_amount)
@@ -90,305 +69,143 @@ relative_difference = difference / abs(primary.converted_amount)
 agreed = relative_difference <= Decimal("0.005")
 ```
 
-If the legs disagree, the coordinator returns both quotes and a warning. It
-does not ask either model to choose the more convincing number.
+The model handles intent and chooses one tool call. Framework-independent code
+owns arithmetic, concurrency, timeout policy, and failure reporting.
 
-## Why coverage in both directions matters
+## The boundary that survived the flip
 
-It would have been easy to rewrite the application around Microsoft Agent
-Framework. That would make the comparison less useful.
+The stable application depends on two interfaces:
 
-Instead, the stable domain layer stayed independent of both vendors:
+- an MCP-backed `ExchangeRateTool`;
+- an A2A-backed `RemoteCurrencyAgent`.
 
-```text
-coordinator/
-    models.py          Decimal domain types
-    service.py         three benchmark modes and fallback policy
-    compare.py         deterministic verification
-    adapters.py        framework-independent boundaries
-    a2a_remote.py      A2A client adapter
-    mcp_stdio.py       MCP client adapter
-```
+Microsoft Agent Framework and Foundry hosting sit outside those interfaces.
+Strands and AgentCore sit outside them on the other side. Flipping the clouds
+did not require rewriting the domain service.
 
-Only the hosting adapters traded places.
+That is more valuable than merely getting two SDKs into one process. Each cloud
+can be deployed independently, and the benchmark can still compare MCP-only,
+A2A-only, and verified execution.
 
-Foundry now hosts the master agent. Its model collects the amount, source
-currency, target currencies, and benchmark mode, then invokes
-`run_currency_benchmark` exactly once.
+## Authentication was the real cross-cloud problem
 
-AgentCore now hosts a narrow Strands specialist. It exposes an A2A server and
-has one currency tool backed by MCP.
+AgentCore's default runtime authorization is IAM/SigV4. That is appropriate for
+AWS callers, but a Foundry-hosted container does not automatically have AWS
+credentials.
 
-That separation is the main design result. Foundry can take coverage as the
-main cloud without changing validation, arithmetic, comparison, or failure
-policy. Bedrock can move behind the remote boundary without learning how the
-master chooses modes or handles partial failure.
-
-## The Foundry master
-
-The Foundry entrypoint uses Microsoft Agent Framework and the responses hosting
-server:
-
-```python
-from agent_framework import Agent, tool
-from agent_framework.foundry import FoundryChatClient
-from agent_framework_foundry_hosting import ResponsesHostServer
-
-from coordinator.hosted_tool import run_currency_benchmark
-
-agent = Agent(
-    client=FoundryChatClient(...),
-    name="currency-coordinator",
-    instructions=INSTRUCTION,
-    tools=[tool(run_currency_benchmark)],
-    default_options={"store": False},
-)
-
-ResponsesHostServer(agent).run()
-```
-
-The instruction is deliberately restrictive:
+For this test I configured AgentCore with a custom JWT authorizer and used a
+Cognito machine-to-machine client:
 
 ```text
-For every conversion call run_currency_benchmark exactly once.
-Never calculate or verify arithmetic yourself.
-Preserve amounts, rates, timestamps, source labels, failures,
-and warnings exactly.
+Foundry container
+    ├── client_credentials ──> Cognito token endpoint
+    └── Bearer JWT ──────────> AgentCore A2A runtime
 ```
 
-The hosted model remains useful for intent handling and explanation. It is not
-the system of record for money.
+The coordinator's A2A adapter now supports OAuth client credentials, caches the
+token until shortly before expiry, and retains static bearer support for other
+peer profiles. The AgentCore authorizer validates the issuer, client, and
+required `currencybench/invoke` scope.
 
-## The Bedrock remote agent
+No token participates in the domain layer.
 
-AgentCore Runtime supports A2A as a first-class runtime protocol. The remote
-entrypoint wraps a Strands agent with `StrandsA2AExecutor` and starts it with
-`serve_a2a`:
+## What broke before the green run
 
-```python
-from bedrock_agentcore.runtime import serve_a2a
-from strands import Agent, tool
-from strands.multiagent.a2a.executor import StrandsA2AExecutor
+The successful diagram hides most of the work. These were observed failures,
+not hypothetical risks.
 
-@tool
-async def convert_currency(
-    amount: str,
-    source_currency: str,
-    target_currencies: list[str],
-) -> str:
-    request = ConversionRequest(
-        amount=Decimal(amount),
-        source_currency=source_currency,
-        target_currencies=target_currencies,
-    )
-    quotes = await McpStdioExchangeRateTool().convert(request)
-    return serialize_quotes(quotes)
+### 1. AgentCore's A2A server and the client wanted different SDK generations
 
-agent = Agent(
-    model=load_model(),
-    system_prompt=SYSTEM_PROMPT,
-    tools=[convert_currency],
-)
+The coordinator client uses A2A 1.x. AgentCore's A2A extra currently requires
+the 0.3 line in the deployed server bundle. Installing both into the same
+bundle produced an unsatisfiable dependency graph.
 
-serve_a2a(StrandsA2AExecutor(agent))
-```
+The fix was architectural: pin the AgentCore application bundle to its
+compatible A2A SDK while keeping the Foundry-side client separate. The network
+protocol interoperated even though the Python packages did not share a
+version.
 
-The AgentCore manifest also changes from the ordinary HTTP runtime contract to:
+### 2. IAM authorization did not cross the cloud boundary
+
+A direct AWS CLI invocation worked, but the Foundry container could not sign an
+AWS request. Switching the runtime to custom JWT authorization and adding the
+OAuth adapter made the remote callable without embedding AWS credentials.
+
+### 3. The default ten-second timeout was false confidence
+
+The first hosted `a2a_only` call failed cleanly:
 
 ```json
 {
-  "name": "CurrencyAgent",
-  "protocol": "A2A",
-  "entrypoint": "main.py"
+  "failures": {
+    "a2a": "timeout: adapter timed out"
+  },
+  "elapsed_ms": 10010
 }
 ```
 
-According to the current AgentCore documentation, `serve_a2a` supplies the
-agent card, health endpoint, Bedrock header propagation, and the stateless A2A
-server expected on port 9000.
+A direct remote call had already taken about 25 seconds. The adapter was
+working; the benchmark policy was too aggressive for a cold cross-cloud path.
+The hosted timeout is now 60 seconds. The next A2A-only invocation completed in
+25.1 seconds.
 
-## A2A stays behind one adapter
+### 4. Foundry's source build could not find its image
 
-The coordinator does not import Strands, Bedrock, or Microsoft Agent Framework.
-It depends on a `RemoteCurrencyAgent` protocol.
+The hosted-agent remote build repeatedly ended with `ImageError: Container
+image not found`. I switched to a prebuilt, digest-pinned image in Azure
+Container Registry.
 
-The Bedrock-specific client settings live in a peer profile:
+The next failure was more precise: registry authentication. Three identities
+were visible—the Foundry account, the project, and the per-agent runtime
+identity. Image pull uses the **project managed identity**. Granting the other
+two `AcrPull` did not help.
 
-```python
-BEDROCK_PEER = A2APeerProfile(
-    name="bedrock",
-    source="hosted-bedrock-a2a",
-    rewrite_card_urls=False,
-    token_env="CURRENCY_BEDROCK_A2A_BEARER_TOKEN",
-    endpoint_env="CURRENCY_BEDROCK_A2A_ENDPOINT",
-)
-```
+The deployment became active after:
 
-Earlier Google ADK and Foundry peer profiles remain in the repository. Keeping
-them is intentional: the benchmark can reproduce earlier evidence without
-putting old vendor conditions into the domain service.
+- enabling ACR authentication-as-ARM;
+- granting the project identity repository-reader/pull access; and
+- redeploying the same digest-pinned image.
 
-## Authentication changes direction too
+### 5. Azure resource state and RBAC both had memory
 
-In the previous topology, AWS needed a Microsoft Entra identity to read the
-Foundry card and invoke the remote agent.
+A soft-deleted Foundry account blocked recreation until it was purged. Project
+role assignments also took time to propagate. Those are deployment-plane
+facts, distinct from whether A2A works at runtime.
 
-After the flip, Foundry needs permission to call AgentCore Runtime. The current
-adapter accepts:
+## The smoke result
 
-```text
-CURRENCY_BEDROCK_A2A_ENDPOINT
-CURRENCY_BEDROCK_A2A_BEARER_TOKEN
-```
+In verified mode, Foundry started both adapters. Its MCP leg returned rate
+`0.87138`; the AgentCore specialist returned rate `0.87138`. Deterministic code
+computed a relative difference of zero and marked the quotes as agreed.
 
-The token is not committed to `azure.yaml`, `.env`, logs, or benchmark output.
-The deployment script writes it to the local `azd` environment as a secret.
+The MCP result also carried a stale-observation warning. The coordinator
+preserved it rather than letting the model smooth it away.
 
-This is adequate for an initial authenticated smoke test, but token lifecycle
-is part of the benchmark—not an implementation detail to hide. A production
-version should use an appropriate renewable workload identity or OAuth
-configuration rather than treating a short-lived token as static application
-configuration.
+The hosted response took about 45 seconds end to end while the measured adapter
+work took 28.2 seconds. That gap includes model and hosted-response overhead.
+With one observation, it would be irresponsible to call either number a
+benchmark.
 
-## Failure behavior did not change
-
-The coordinator preserves the same policy in either cloud direction:
-
-- MCP fails, A2A succeeds: return the remote quote as explicitly unverified.
-- A2A fails, MCP succeeds: return the MCP quote with verification missing.
-- Both succeed but disagree: return both and warn.
-- Both fail: return typed failures and fabricate nothing.
-- Any quote is stale: retain it with its timestamp and add a warning.
-
-Verified mode starts both legs concurrently:
-
-```python
-mcp_quotes, a2a_quotes = await asyncio.gather(
-    call_mcp(),
-    call_a2a(),
-)
-```
-
-That means verified latency is normally dominated by the slower leg, not the
-sum of both legs.
-
-## Run the local benchmark
-
-Clone and test:
-
-```bash
-git clone https://github.com/xbill9/foundry-bedrock-a2a-currency.git
-cd foundry-bedrock-a2a-currency
-
-pip3 install --user --break-system-packages -e ".[dev]"
-python3 -m pytest -q
-```
-
-The current implementation passes 67 tests covering:
-
-- `Decimal` conversion and comparison;
-- all three orchestration modes;
-- concurrent verification;
-- timeout and fallback behavior;
-- MCP subprocess transport;
-- A2A card and response parsing;
-- Foundry-shaped authenticated A2A behavior;
-- the new default Bedrock peer and bearer header; and
-- deployment-manifest assertions.
-
-Exercise the credential-free fixtures:
-
-```bash
-python3 -m coordinator.cli 100 USD EUR --mode mcp_only
-python3 -m coordinator.cli 100 USD EUR --mode a2a_only
-python3 -m coordinator.cli \
-  100 USD EUR --mode verified --transport mcp-stdio --json
-```
-
-Fixture rates validate orchestration. They are not live financial quotes.
-
-## Deploy in the new order
-
-Deploy Bedrock first because Foundry needs its A2A endpoint:
-
-```bash
-./infra/sync_app.sh
-agentcore deploy -y
-```
-
-Retrieve the AgentCore runtime URL and authentication token through the
-AgentCore CLI or AWS API. Then deploy the Foundry master:
-
-```bash
-export CURRENCY_BEDROCK_A2A_ENDPOINT="https://.../invocations/"
-export CURRENCY_BEDROCK_A2A_BEARER_TOKEN="..."
-
-az login
-azd auth login
-./infra/deploy_foundry_peer.sh
-```
-
-The script supplies the endpoint as configuration and the token as an azd
-secret.
-
-## Coverage status: observed versus pending
+## What this proves—and what it does not
 
 Observed:
 
-- The earlier Bedrock-master to Foundry-remote topology completed all three
-  hosted modes on July 29, 2026.
-- Its smoke conversion for 100 USD to EUR agreed across MCP and A2A.
-- The Foundry-main code passes 67 local deterministic tests.
-- The AgentCore runtime is configured for A2A and the Foundry host is configured
-  as the coordinator.
+- Foundry hosted the master coordinator.
+- Foundry's MCP-only path completed.
+- Foundry acquired an OAuth token and invoked AgentCore over A2A.
+- AgentCore returned a structured currency quote.
+- Verified mode ran both paths and reported exact agreement.
+- The three-mode smoke completed without adapter failures after the timeout
+  correction.
 
-Not yet observed:
+Not yet established:
 
-- a deployed Foundry-to-Bedrock end-to-end request;
-- the full 38-case inverted cloud matrix;
 - warm and cold latency distributions;
-- token use and cloud cost;
-- runtime token renewal behavior; and
-- cross-cloud trace correlation.
+- behavior under throttling or token expiry;
+- a full multi-currency matrix;
+- production secret rotation and availability controls;
+- superiority of either framework or cloud.
 
-I would rather publish those as open measurements than imply that a green unit
-test proves cloud interoperability.
-
-## What completes the Foundry-main validation
-
-The implementation provides structural and deterministic test coverage. The
-remaining acceptance run must prove the cloud boundary itself. Foundry-main
-coverage is complete when:
-
-1. A real Foundry-hosted request completes in all three modes.
-2. `a2a_only` shows `hosted-bedrock-a2a` as its source.
-3. `verified` records both the Foundry-side MCP quote and Bedrock-side quote.
-4. A forced A2A failure returns the MCP result as unverified.
-5. A forced MCP failure returns the Bedrock result as unverified.
-6. A disagreement returns both values and a deterministic warning.
-7. Authentication, card discovery, and trace identifiers are captured with
-   secrets and account identifiers redacted.
-
-Once those checks run, the interesting comparison is no longer “can A2A return
-HTTP 200?”
-
-It is:
-
-- Does orchestration direction change completion rate?
-- Which platform has the larger cold-start contribution?
-- How much latency comes from the model, MCP, authentication, and A2A?
-- Does either direction recover more cleanly when one leg fails?
-- How much glue is genuinely protocol-specific?
-- Can the same 38 cases and deterministic scorers compare both directions
-  without special treatment?
-
-That is the point of this coverage work. A portable agent protocol is most
-convincing when Foundry can be the main cloud, Amazon can be remote, and the
-benchmark still means exactly the same thing.
-
-## References
-
-- [Deploy A2A servers in Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a.html)
-- [A2A protocol contract for AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a-protocol-contract.html)
-- [Microsoft Foundry hosted agents](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agents)
-- [Project source](https://github.com/xbill9/foundry-bedrock-a2a-currency)
+That distinction is the point of the project. The result is coverage, not a
+victory lap: Microsoft Foundry works as the main cloud, and Amazon Bedrock
+AgentCore works as its authenticated remote A2A specialist.

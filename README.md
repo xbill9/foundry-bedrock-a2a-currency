@@ -55,7 +55,7 @@ The first publishable version has only:
 - one remote Strands currency agent in Bedrock AgentCore;
 - one MCP exchange-rate server;
 - one AgentCore Runtime deployment;
-- AgentCore runtime authentication supplied to the Foundry host as a secret;
+- scoped OAuth client-credentials authentication from Foundry to AgentCore;
 - A2A agent-card discovery;
 - structured conversion results;
 - hosted trace correlation, with benchmark trace-ID export still pending; and
@@ -143,18 +143,21 @@ Deploy the AgentCore A2A specialist first:
 agentcore deploy -y
 ```
 
-Retrieve its runtime URL/card and a runtime bearer token using the AgentCore
-CLI or AWS API, then inject both without committing them:
+Configure AgentCore custom-JWT authorization with a machine-to-machine OAuth
+client, then inject its endpoint and OAuth settings without committing them:
 
 ```bash
 export CURRENCY_BEDROCK_A2A_ENDPOINT='https://.../invocations/'
-export CURRENCY_BEDROCK_A2A_BEARER_TOKEN='...'
+export CURRENCY_BEDROCK_OAUTH_TOKEN_URL='https://.../oauth2/token'
+export CURRENCY_BEDROCK_OAUTH_CLIENT_ID='...'
+export CURRENCY_BEDROCK_OAUTH_CLIENT_SECRET='...'
+export CURRENCY_BEDROCK_OAUTH_SCOPE='currencybench/invoke'
 az login && azd auth login
 ./infra/deploy_foundry_peer.sh
 ```
 
-The bearer value is stored as a secret in the local azd environment. It is not
-written to `azure.yaml` or any tracked file.
+The OAuth adapter caches short-lived access tokens. The client secret remains
+deployment configuration and must not be written to tracked files or evidence.
 
 Direct hosted-agent dependencies are pinned in `requirements.txt`. Update those
 pins only after a new end-to-end deployment has been verified, and retain the
@@ -205,6 +208,12 @@ produce one set of numbers per peer.
   from the AgentCore-hosted AWS coordinator. All three hosted modes completed.
   For the 100 USD → EUR smoke case, MCP and Foundry both returned rate
   `0.87873` and amount `87.87300`; verified mode agreed with no warnings.
+- Observed on 2026-07-30: the topology was reversed. A Foundry-hosted master
+  completed `mcp_only`, `a2a_only`, and `verified` against an AgentCore A2A
+  remote. For 100 USD → EUR both legs returned rate `0.87138`; deterministic
+  verification reported relative difference `0` and agreement. This is one
+  sanitized smoke case, not a latency distribution; see
+  `evaluations/results/smoke-foundry-bedrock-2026-07-30.json`.
 - Not yet measured: token usage, cloud cost, repeated warm/cold hosted
   distributions, the full 38-case AWS → Foundry matrix, or benchmark trace-ID
   export.
